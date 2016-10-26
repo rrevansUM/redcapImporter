@@ -1,0 +1,245 @@
+---
+title: "Vignette Title"
+author: "Vignette Author"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Vignette Title}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+# Prerequisites:
+
+  1. Have R installed
+  2. Have access to REDCap
+  3. Have access to HIVE data on REDCap, both 'HIVE Study' and 'HIVE Enrollment'
+
+# Description
+
+This function takes patient data from HIVE Enrollment project on REDCap and processes it, transforming the data into described by the REDCap import template
+
+The redcap.importer() function takes three inputs:
+
+  1.  hive.enroll.file - data exported from the HIVE Enrollment project on REDCap as a _file path_ ending in .csv, enclosed in quotes, e.g. "U:/EPID/Monto/HIVE_2016_2017/REDCap/Data Exports/HIVE enrollment export update.csv"
+  2.  hive.study.file - the output file name as a _file path_ enclosed in quotes. The file path and output file name for this project has been set to "U:/EPID/Monto/HIVE_2016_2017/REDCap/Data Exports/HIVE study import update.csv"
+  3.  arm - specify the arm of the study. the function accepts 1, 2 and 3 for re-enrollees, new HIVE, and pediatric HIVE, respectively
+  
+Good news! The only only one users will have to worry about modifying is the last one, the arm input. The input and output files already been selected for you and centralized in the U drive. In the case that the server is down but internet access is available, it is possible to change the input and output file paths to your desktop, downloads folder or any other local folder.
+
+```{r}
+redcap.importer <- function(hive.enroll.file="U:/EPID/Monto/HIVE_2016_2017/REDCap/Data Exports/HIVE enrollment export update.csv", 
+                            hive.study.file="U:/EPID/Monto/HIVE_2016_2017/REDCap/Data Exports/HIVE study import update.csv", 
+                            arm=2){
+  
+  try(if(!(arm %in% c(1,2,3))){
+    stop("arm not one of 1, 2, or 3")})
+  try(if(!exists("hive.enroll.file")){
+    stop("hive.enroll.file does not exist or is not chosen")})
+  try(if(!exists("hive.study.file")){
+    stop("hive.study.file does not exist or is not chosen")})
+  
+  # Import data (extension = .csv) (default location will be from the downloads folder)
+  hive.enrollment.data <- read.csv(file=hive.enroll.file, stringsAsFactors=FALSE)
+  
+  if(arm==1){
+    arm.txt = "enrollment_arm_1"
+    
+    # variables to be moved
+    pt.info.vars <- c("studyid","houseid_demhlth","fname","lname","dob","enroll_date")
+    
+    # reduce to variables described in pt.info.vars and subset, removing structual missing values
+    hive.enroll.reduced <- hive.enrollment.data[ ,colnames(hive.enrollment.data) %in% pt.info.vars]
+    hive.enroll.reduced.subset <- subset(hive.enroll.reduced, !is.na(hive.enroll.reduced$houseid_demhlth))
+    
+    # rename variables
+    colnames(hive.enroll.reduced.subset) <- sub("houseid_demhlth","houseid",colnames(hive.enroll.reduced.subset))
+    colnames(hive.enroll.reduced.subset) <- sub("enroll_date","enrolldate",colnames(hive.enroll.reduced.subset))
+    
+    hive.enroll.reduced.subset <- within(hive.enroll.reduced.subset,{
+      # add patient_information_complete
+      patient_information_complete <- 2
+      # add recordid as studyid
+      recordid <- studyid
+      # add redcap_event_name
+      redcap_event_name <- arm.txt
+    })
+    
+    # add household e_mail
+    email.by.hh <- hive.enrollment.data[,c("houseid","house_email")]
+    colnames(email.by.hh) <- sub("house_email","email",colnames(email.by.hh))
+    email.by.hh.subset <- subset(email.by.hh, !is.na(email.by.hh$houseid))
+    hive.enroll.reduced.subset.final <- merge(email.by.hh.subset,
+                                              hive.enroll.reduced.subset,
+                                              by="houseid")
+    temp <- hive.enroll.reduced.subset.final
+    
+    # reorder data columns
+    temp <- temp[,c("recordid","redcap_event_name","studyid","houseid","fname", 
+                    "lname","email","dob","enrolldate","patient_information_complete")]
+    
+    # write to file for import into REDCap
+    write.csv(temp, file=hive.study.file, row.names=FALSE)
+    
+    # free memory
+    rm(hive.enrollment.data,
+       pt.info.vars,
+       hive.enroll.reduced,
+       hive.enroll.reduced.subset,
+       email.by.hh,
+       email.by.hh.subset,
+       hive.enroll.reduced.subset.final,
+       temp)
+  }
+  else if(arm==2){
+    arm.txt = "enrollment_arm_2"
+    
+    # variables to be moved
+    pt.info.vars <- c("studyid_a2","houseid_demhlth_a2","fname_a2","lname_a2","dob_a2","enroll_date_a2","email_followup")
+    
+    # reduce to variables described in pt.info.vars and subset, removing structual missing values
+    hive.enroll.reduced <- hive.enrollment.data[ ,colnames(hive.enrollment.data) %in% pt.info.vars]
+    hive.enroll.reduced.subset <- subset(hive.enroll.reduced, !is.na(hive.enroll.reduced$houseid_demhlth))
+    
+    # rename variables
+    colnames(hive.enroll.reduced.subset) <- sub("houseid_demhlth_a2","houseid",colnames(hive.enroll.reduced.subset))
+    colnames(hive.enroll.reduced.subset) <- sub("email_followup","email",colnames(hive.enroll.reduced.subset))
+    colnames(hive.enroll.reduced.subset) <- sub("studyid_a2","studyid",colnames(hive.enroll.reduced.subset))
+    colnames(hive.enroll.reduced.subset) <- sub("enroll_date_a2","enrolldate",colnames(hive.enroll.reduced.subset))
+    colnames(hive.enroll.reduced.subset) <- sub("fname_a2","fname",colnames(hive.enroll.reduced.subset))
+    colnames(hive.enroll.reduced.subset) <- sub("lname_a2","lname",colnames(hive.enroll.reduced.subset))
+    colnames(hive.enroll.reduced.subset) <- sub("dob_a2","dob",colnames(hive.enroll.reduced.subset))
+    
+    hive.enroll.reduced.subset <- within(hive.enroll.reduced.subset,{
+      # add patient_information_complete
+      patient_information_complete <- 2
+      # add recordid as studyid
+      recordid <- studyid
+      # add redcap_event_name
+      redcap_event_name <- arm.txt
+    })
+    
+    # reorder data columns
+    hive.enroll.reduced.subset <- hive.enroll.reduced.subset[,c("recordid","redcap_event_name","studyid",
+                                                                "houseid","fname", "lname","email","dob",
+                                                                "enrolldate","patient_information_complete")]
+    
+    # write to file for import into REDCap
+    write.csv(hive.enroll.reduced.subset, file=hive.study.file, row.names=FALSE)
+    
+    # free memory
+    rm(hive.enrollment.data,
+       pt.info.vars,
+       hive.enroll.reduced,
+       hive.enroll.reduced.subset)
+  }
+  else if(arm==3){
+    arm.txt = "enrollment_arm_3"
+    
+    # variables to be moved
+    pt.info.vars <- c("studyid_a3","houseid_demhlth_a3","fname_a3","lname_a3","dob_a3","enroll_date_a3")
+    
+    # reduce to variables described in pt.info.vars and subset, removing structual missing values
+    hive.enroll.reduced <- hive.enrollment.data[ ,colnames(hive.enrollment.data) %in% pt.info.vars]
+    hive.enroll.reduced.subset <- subset(hive.enroll.reduced, !is.na(hive.enroll.reduced$houseid_demhlth))
+    
+    # rename variables
+    colnames(hive.enroll.reduced.subset) <- sub("houseid_demhlth_a3","houseid",colnames(hive.enroll.reduced.subset))
+    colnames(hive.enroll.reduced.subset) <- sub("studyid_a3","studyid",colnames(hive.enroll.reduced.subset))
+    colnames(hive.enroll.reduced.subset) <- sub("enroll_date_a3","enrolldate",colnames(hive.enroll.reduced.subset))
+    colnames(hive.enroll.reduced.subset) <- sub("fname_a3","fname",colnames(hive.enroll.reduced.subset))
+    colnames(hive.enroll.reduced.subset) <- sub("lname_a3","lname",colnames(hive.enroll.reduced.subset))
+    colnames(hive.enroll.reduced.subset) <- sub("dob_a3","dob",colnames(hive.enroll.reduced.subset))
+    
+    hive.enroll.reduced.subset <- within(hive.enroll.reduced.subset,{
+      # add patient_information_complete
+      patient_information_complete <- 2
+      # add recordid as studyid
+      recordid <- studyid
+      # add redcap_event_name
+      redcap_event_name <- arm.txt
+    })
+    
+    # add household e_mail
+    email.by.hh <- hive.enrollment.data[,c("houseid","house_email")]
+    colnames(email.by.hh) <- sub("house_email","email",colnames(email.by.hh))
+    email.by.hh.subset <- subset(email.by.hh, !is.na(email.by.hh$houseid))
+    hive.enroll.reduced.subset.final <- merge(email.by.hh.subset,
+                                              hive.enroll.reduced.subset,
+                                              by="houseid")
+    temp <- hive.enroll.reduced.subset.final
+    
+    # reorder data columns
+    temp <- temp[,c("recordid","redcap_event_name","studyid",
+                    "houseid","fname", "lname","email","dob",
+                    "enrolldate","patient_information_complete")]
+    
+    # write to file for import into REDCap
+    write.csv(temp, file=hive.study.file, row.names=FALSE)
+    
+    # free memory
+    rm(hive.enrollment.data,
+       pt.info.vars,
+       hive.enroll.reduced,
+       hive.enroll.reduced.subset,
+       hive.enroll.reduced.subset.final,
+       temp)
+  }
+  print("File Done")
+  print("See 'HIVE study import update.csv' in U:/EPID/Monto/HIVE_2016_2017/REDCap/Data Exports")
+}
+```
+
+# Tutorial
+
+The first step is to download (export) the data from REDCap under the HIVE Enrollment project under production mode:
+<https://redcapproduction.umms.med.umich.edu>. Once there, find the 'Data Exports, Reports, and Stats link in the menu on the left. 
+
+![My Reports & Exports Section.](C:\\Users\\rrevans\\Pictures\\export.PNG)
+
+Users have the option to download A 'All data (all records and fields)' and download B 'Selected instruments and/or events (all records)'. The function will work on either form as long as your selections include information from the 'household_contact_form' and 'demographics'. For this tutorial I will select all data.
+
+![My Reports & Exports Section - File Options.](C:\\Users\\rrevans\\Pictures\\exporting all data page.PNG)
+
+For the function 'redcap.importer' to work we will need to download the first option 'CSV/Microsoft Excel (raw data)' by clicking it and then clicking 'Export Data' in the bottom right. To function properly, users need access to 'Full data' that is, not de-identified, or else the information imported into HIVE study - patient information, will be wrong.
+
+![Export and Download.](C:\\Users\\rrevans\\Pictures\\data export successful.PNG)
+
+You can then download the data by clicking on the icon in the bottom right - most likely it will download to your 'downloads' folder, it will still be a good idea to check the directory where it will download. For this project We will need users to place the downloaded file into a folder on the U drive: U:\EPID\Monto\HIVE_2016_2017\REDCap\Data Exports\ and save a **COPY** as 'HIVE enrollment export update'. This can be done by right-clicking on the file and selecting copy, then click elsewhere and 'paste' the document by right-clicking again within this same folder.
+
+At this point R will need to be open and running, either R GUI or R Studio will suffice. I've placed an R installer (R-3.3.1-win.exe) into the U drive folder above (U:\EPID\Monto\HIVE_2016_2017\REDCap\Data Exports) in the event any computer does not already have R installed. However, the user will need administrator rights to install it on any computer.
+
+![R open.](C:\\Users\\rrevans\\Pictures\\RGui.PNG)
+
+The program should be pre-installed in the system. If it isn't then you can either copy and paste the code from above into the R system like so:
+
+![Copied and Pasted Code.](C:\\Users\\rrevans\\Pictures\\RGui copy and paste.PNG)
+
+Then, you simply copy and paste or type in 'redcap.importer(arm=2)' and inside of U:\EPID\Monto\HIVE_2016_2017\REDCap\Data Exports\ you will see 'HIVE study import update.csv', the final product. In the event that the user needs to enter data for arms 1 (HIVE re-enrollees) or arm 3 (pediatric clinic HIVE), simply change the function to 'redcap.importer(arm=1)' or 'redcap.importer(arm=3)', respectively. The default is arm 2, and so if a user enters into the R command line 'redcap.importer()' without 'arm' specified, then arm 2 is assumed.
+
+![After running the program.](C:\\Users\\rrevans\\Pictures\\redcap importer.PNG)
+
+The next step is to simply upload 'HIVE study import update.csv' to REDCap by navigating to the 'HIVE Study' project in REDCap production mode and accessing the 'Data import Tool'
+
+![HIVE Study dashboard.](C:\\Users\\rrevans\\Pictures\\hive study.PNG)
+
+Once accessing the Data Import Tool module, scroll to the bottom of the page to see a spot to 'Choose File' and 'Upload File'
+
+![Uploading to HIVE Study.](C:\\Users\\rrevans\\Pictures\\upload file.PNG)
+
+Next, click 'Choose File' and navigate to U:\EPID\Monto\HIVE_2016_2017\REDCap\Data Exports\HIVE study import update.csv then click 'Upload File'. You will then see the following:
+
+![Uploading to HIVE Study (cont.)](C:\\Users\\rrevans\\Pictures\\check file.PNG)
+
+In this example all the data was already uploaded so no new data could be uploaded. When you are uploading new data the REDCap web page will have a button near the bottom to approve of the upload: data will not be uploaded until you hit that button.
+
+Then you are done.
+
+# In Summary
+
+In summary there are three major steps:
+
+  1.  Download (export) the data from REDCap:HIVE Enrollment
+      a. place file into the U drive and copy it and rename it to 'HIVE enrollment export update'
+  2.  Open R and run 'redcap.importer()'
+  3.  Open REDCap:HIVE Study and import 'HIVE study import update.csv' to REDCap
