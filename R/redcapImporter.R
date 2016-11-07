@@ -77,7 +77,7 @@ redcap.importer <- function(hive.enroll.file="U:/EPID/Monto/HIVE_2016_2017/REDCa
     
     # reduce to variables described in pt.info.vars and subset, removing structual missing values
     hive.enroll.reduced <- hive.enrollment.data[ ,colnames(hive.enrollment.data) %in% pt.info.vars]
-    hive.enroll.reduced.subset <- subset(hive.enroll.reduced, !is.na(hive.enroll.reduced$houseid_demhlth))
+    hive.enroll.reduced.subset <- subset(hive.enroll.reduced, !is.na(hive.enroll.reduced$houseid_demhlth_a2))
     
     # rename variables
     colnames(hive.enroll.reduced.subset) <- sub("houseid_demhlth_a2","houseid",colnames(hive.enroll.reduced.subset))
@@ -119,7 +119,7 @@ redcap.importer <- function(hive.enroll.file="U:/EPID/Monto/HIVE_2016_2017/REDCa
     
     # reduce to variables described in pt.info.vars and subset, removing structual missing values
     hive.enroll.reduced <- hive.enrollment.data[ ,colnames(hive.enrollment.data) %in% pt.info.vars]
-    hive.enroll.reduced.subset <- subset(hive.enroll.reduced, !is.na(hive.enroll.reduced$houseid_demhlth))
+    hive.enroll.reduced.subset <- subset(hive.enroll.reduced, !is.na(hive.enroll.reduced$houseid_demhlth_a3))
     
     # rename variables
     colnames(hive.enroll.reduced.subset) <- sub("houseid_demhlth_a3","houseid",colnames(hive.enroll.reduced.subset))
